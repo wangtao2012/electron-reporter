@@ -1,7 +1,7 @@
-import _ from 'lodash'
-import {queue} from 'd3-queue'
+const _ = require('lodash')
+const { queue } = require('d3-queue')
 
-export default class ReportQueue {
+module.exports = module.exports.default = class ReportQueue {
   constructor(options = {}) {
     // 并行数量
     this.concurrency = options.concurrency || 1

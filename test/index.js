@@ -1,4 +1,4 @@
-import Reporter from '../src'
+const Reporter = require('../src')
 
 let logger = new Reporter({
   url: '',

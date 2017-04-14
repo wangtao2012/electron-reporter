@@ -1,18 +1,18 @@
 /** @fileOverview 给electron/nw等类似客户端用的日志上报模块 **/
-import ip from 'ip'
-import network from 'network'
-import os from 'os'
-import ping from 'ping'
-import request from 'request'
-import path from 'path'
+const ip = require('ip')
+const network = require('network')
+const os = require('os')
+const ping = require('ping')
+const request = require('request')
+const path = require('path')
 
-import fs from 'fs-extra-promise'
-import _ from 'lodash'
-import log4js from 'log4js'
-import moment from 'moment'
-import unzip from 'cross-unzip'
-import FILE from './file'
-import Queue from './ReportQueue'
+const fs = require('fs-extra-promise')
+const _ = require('lodash')
+const log4js = require('log4js')
+const moment = require('moment')
+const unzip = require('cross-unzip')
+const FILE = require('./file')
+const Queue = require('./ReportQueue')
 
 // 一些辅助方法
 const reportHelper = {
@@ -102,75 +102,6 @@ const systemVersion = reportHelper.getSystemVersion()
 const platForm = reportHelper.getPlatform()
 
 class Reporter {
-
-  static LEVELS = {
-    DEBUG: 1,
-    INFO: 2,
-    WARN: 3,
-    ERROR: 4
-  }
-
-  static helper = reportHelper
-
-  /**
-   * 根据level的value取得level的key
-   * @param val
-   * @returns {string}
-   */
-  static getLevelKey(val) {
-    let name
-    Object.keys(Reporter.LEVELS).forEach(key => {
-      if (Reporter.LEVELS[key] === val) {
-        name = key
-      }
-    })
-    return name
-  }
-
-  static defaultOptions = {
-    // 上报地址
-    url: '',
-    // 日志文件上传地址
-    uploadUrl: '',
-    // 设备名字
-    deviceName: '',
-    // 客户端版本号
-    version: '',
-    // log文件存储目录
-    dir: process.cwd(),
-    // 默认上报级别
-    level: Reporter.LEVELS.WARN,
-    // 不同级别类型日志是否完全保存在本地, 默认全部保存在本地
-    // 一旦通过构造函数设置后, 便不可变更, 变更后也是无效的
-    localLogLevel: 0,
-    // 是否打印控制台log, 同上
-    consoleLogLevel: 0,
-    // 定时上报时间间隔, 即便没积攒达到上报数量阈值，只要达到时间间隔，仍然上报
-    interval: 1000 * 60 * 5,
-    // 上报积攒数量阈值, 积攒到阈值就上报
-    threshold: 500,
-    // 一次上报日志数量允许的最大值
-    maxCount: 500,
-    // 文件命名的前缀
-    filenamePrefix: '',
-    // 上报时需要ping的域名集合
-    hosts: [],
-    // 本地历史记录保持时间
-    historyKeepDays: 7,
-    // 临时文件保持时间
-    tempKeepDays: 3,
-    // 加密配置
-    encryptOptions: {
-      key: '78afc8512559b62f',
-      iv: '78afc8512559b62f',
-      clearEncoding: 'utf8',
-      algorithm: 'aes-128-cbc'
-    },
-    // ping获取的时间间隔
-    pingThrottle: 15 * 1000,
-    // network获取的时间间隔
-    networkThrottle: 15 * 1000
-  }
 
   constructor(options) {
     /**
@@ -415,7 +346,7 @@ class Reporter {
         network: this.network.value,
         ping: this.ping.value
       })
-    } 
+    }
     return data
   }
 
@@ -464,7 +395,8 @@ class Reporter {
     let filename = levelKey + '.temp-' + moment().format('YYYY-MM-DD')
     let filePath = this._getFilePathByName(filename)
     if (!fs.existsSync(filePath)) {
-      fs.openSync(filePath, 'w')
+      const fd = fs.openSync(filePath, 'w');
+      fs.closeSync(fd)
     }
     return {
       level,
@@ -487,7 +419,7 @@ class Reporter {
     let {filePath} = this._getCurrentTemp(level)
 
     // 手动写入日志
-    fs.appendFile(filePath, record + reportHelper.endOfLine())
+    fs.appendFileSync(filePath, record + reportHelper.endOfLine())
 
     // log4js 自动写入日志
     // log4js写的文件 不做任何处理, 让log4js自动处理(自动根据日期/文件大小分割文件/清除文件等)
@@ -607,7 +539,9 @@ class Reporter {
 
     // 如果指明了要删除文件
     if (isUnlinkFile) {
-      fs.unlinkSync(filePath)
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+      }
     }
 
     // 根据macCount把数据分成2段
@@ -700,7 +634,11 @@ class Reporter {
       if (files2Report.length === 1) {
         let file = files2Report[0]
         // 文件大小 小于50k 走字符串上报流程
-        let {size} = fs.statSync(file.filePath)
+        let size
+        try {
+          const stat = await fs.statAsync(file.filePath)
+          size = stat.size || 0
+        } catch (e) {}
         if (size < 1024 * 50) {
           return this._push2LogQueue(file)
         } else { // 否则走文件上传流程
@@ -824,29 +762,6 @@ class Reporter {
   }
 
   /**
-   * 校验上报结果
-   * @param response
-   * @returns {boolean}
-   * @private
-   */
-  static responseValidator(response) {
-    if (response && response.statusCode === 200) {
-      try {
-        const {status} = JSON.parse(response.body)
-        if (status === 0) {
-          return true
-        }
-        console.error('report::: status is not 0')
-        return false
-      } catch (e) {
-        console.error('responseValidator parse body failed')
-        return false
-      }
-    }
-    return false
-  }
-
-  /**
    * 上报日志
    * @param data
    * @returns {Promise}
@@ -953,4 +868,96 @@ class Reporter {
   }
 }
 
-export default Reporter
+Reporter.LEVELS = {
+  DEBUG: 1,
+  INFO: 2,
+  WARN: 3,
+  ERROR: 4
+}
+
+Reporter.helper = reportHelper
+
+/**
+ * 根据level的value取得level的key
+ * @param val
+ * @returns {string}
+ */
+Reporter.getLevelKey = (val) => {
+  let name
+  Object.keys(Reporter.LEVELS).forEach(key => {
+    if (Reporter.LEVELS[key] === val) {
+      name = key
+    }
+  })
+  return name
+}
+
+Reporter.defaultOptions = {
+  // 上报地址
+  url: '',
+  // 日志文件上传地址
+  uploadUrl: '',
+  // 设备名字
+  deviceName: '',
+  // 客户端版本号
+  version: '',
+  // log文件存储目录
+  dir: process.cwd(),
+  // 默认上报级别
+  level: Reporter.LEVELS.WARN,
+  // 不同级别类型日志是否完全保存在本地, 默认全部保存在本地
+  // 一旦通过构造函数设置后, 便不可变更, 变更后也是无效的
+  localLogLevel: 0,
+  // 是否打印控制台log, 同上
+  consoleLogLevel: 0,
+  // 定时上报时间间隔, 即便没积攒达到上报数量阈值，只要达到时间间隔，仍然上报
+  interval: 1000 * 60 * 5,
+  // 上报积攒数量阈值, 积攒到阈值就上报
+  threshold: 500,
+  // 一次上报日志数量允许的最大值
+  maxCount: 500,
+  // 文件命名的前缀
+  filenamePrefix: '',
+  // 上报时需要ping的域名集合
+  hosts: [],
+  // 本地历史记录保持时间
+  historyKeepDays: 7,
+  // 临时文件保持时间
+  tempKeepDays: 3,
+  // 加密配置
+  encryptOptions: {
+    key: '78afc8512559b62f',
+    iv: '78afc8512559b62f',
+    clearEncoding: 'utf8',
+    algorithm: 'aes-128-cbc'
+  },
+  // ping获取的时间间隔
+  pingThrottle: 15 * 1000,
+  // network获取的时间间隔
+  networkThrottle: 15 * 1000
+}
+
+/**
+ * 校验上报结果
+ * @param response
+ * @returns {boolean}
+ * @private
+ */
+Reporter.responseValidator = (response) => {
+  if (response && response.statusCode === 200) {
+    try {
+      const {status} = JSON.parse(response.body)
+      if (status === 0) {
+        return true
+      }
+      console.error('report::: status is not 0')
+      return false
+    } catch (e) {
+      console.error('responseValidator parse body failed')
+      return false
+    }
+  }
+  return false
+}
+
+module.exports.default = Reporter

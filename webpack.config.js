@@ -1,7 +1,7 @@
-import webpack from 'webpack'
-import path from 'path'
-import formatter from 'eslint-formatter-pretty'
-import { dependencies as externals } from './package.json'
+const webpack = require('webpack')
+const path = require('path')
+const formatter = require('eslint-formatter-pretty')
+const { dependencies: externals } = require('./package.json')
 
 const externalsKeys = Object.keys(externals)
 
@@ -42,10 +42,12 @@ let config = {
           // https://babeljs.io/docs/usage/options/
           babelrc: false,
           presets: [
-            'es2015',
-            'stage-0'
+            'env', {
+              "targets": {
+                "node": true,
+              }
+            }
           ],
-          plugins: ['transform-runtime']
         }
       }
     ]
@@ -64,4 +66,4 @@ let config = {
   externals: externalsKeys
 }
 
-export default config
+module.exports = module.exports.default = config

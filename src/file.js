@@ -1,10 +1,10 @@
-import crypto from 'crypto'
-import fs from 'fs'
-import path from 'path'
-import md5File from 'md5-file'
-import FormData from 'form-data'
+const crypto = require('crypto')
+const fs = require('fs')
+const path = require('path')
+const md5File = require('md5-file')
+const FormData = require('form-data')
 
-export default {
+module.exports = module.exports.default = {
   /**
    * 生成随机加密向量
    * @returns {{key, iv}}
